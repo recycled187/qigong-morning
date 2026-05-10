@@ -1,0 +1,13 @@
+{
+  "name": "Qi Gong Morning",
+  "short_name": "Qi Gong",
+  "description": "15-movement morning Qi Gong routine with timer",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0e1411",
+  "theme_color": "#0e1411",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "img/15.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any" }
+  ]
+}
