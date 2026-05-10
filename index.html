@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qi Gong · Morning Routine</title>
+<style>
+  :root {
+    --bg: #0e1411;
+    --panel: #161d18;
+    --ink: #ecf2ed;
+    --muted: #8a958c;
+    --accent: #c44536;
+    --accent-soft: #2a1f1d;
+    --gold: #d4a85a;
+    --border: #232a24;
+    --paper: #f4ecd8;
+    --paper-ink: #2b1d12;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+  }
+  header {
+    width: 100%;
+    max-width: 760px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  h1 { margin: 0; font-size: 18px; font-weight: 500; letter-spacing: 1px; }
+  .pill {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  main {
+    width: 100%;
+    max-width: 760px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .stage {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0;
+    overflow: hidden;
+    position: relative;
+  }
+  .stage.active { border-color: var(--accent); }
+  .visual {
+    background: var(--paper);
+    color: var(--paper-ink);
+    aspect-ratio: 16 / 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .visual::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 20% 30%, rgba(196, 69, 54, 0.06) 0%, transparent 40%),
+      radial-gradient(circle at 80% 70%, rgba(212, 168, 90, 0.08) 0%, transparent 40%);
+    pointer-events: none;
+  }
+  .visual img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+  .calligraphy {
+    font-family: "Noto Serif SC", "Songti SC", "STSong", serif;
+    font-size: 120px;
+    font-weight: 400;
+    letter-spacing: 8px;
+    text-align: center;
+    line-height: 1.1;
+    color: var(--paper-ink);
+    z-index: 1;
+    position: relative;
+  }
+  .calligraphy .seal {
+    display: inline-block;
+    background: var(--accent);
+    color: var(--paper);
+    font-size: 18px;
+    padding: 4px 10px;
+    margin-left: 12px;
+    vertical-align: middle;
+    letter-spacing: 2px;
+    border-radius: 2px;
+  }
+  .info {
+    padding: 22px 24px 18px;
+    text-align: center;
+  }
+  .move-num { font-size: 11px; color: var(--muted); letter-spacing: 2.5px; text-transform: uppercase; }
+  .move-name { font-size: 24px; margin: 8px 0 4px; font-weight: 500; }
+  .move-pinyin { font-size: 13px; color: var(--gold); margin-bottom: 10px; letter-spacing: 1px; }
+  .move-desc { font-size: 14px; color: var(--muted); line-height: 1.6; max-width: 580px; margin: 0 auto 16px; }
+  .timer {
+    font-size: 64px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 200;
+    color: var(--ink);
+    margin: 8px 0 4px;
+  }
+  .progress {
+    height: 3px;
+    background: var(--accent-soft);
+    border-radius: 2px;
+    overflow: hidden;
+    margin: 8px 24px 0;
+  }
+  .progress-bar {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.3s linear;
+  }
+  .controls {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    padding: 16px 24px 22px;
+  }
+  button {
+    background: var(--accent-soft);
+    color: var(--ink);
+    border: 1px solid var(--border);
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+    letter-spacing: 0.3px;
+  }
+  button:hover { background: var(--accent); color: var(--paper); border-color: var(--accent); }
+  button.primary { background: var(--accent); color: var(--paper); border-color: var(--accent); }
+  button.primary:hover { background: var(--gold); border-color: var(--gold); color: var(--paper-ink); }
+  .list {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 8px;
+  }
+  .list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px 12px;
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .row:hover { background: var(--accent-soft); }
+  .row.current { background: var(--accent-soft); border-left: 2px solid var(--accent); }
+  .row.done { opacity: 0.45; }
+  .row-num { color: var(--muted); width: 22px; font-variant-numeric: tabular-nums; }
+  .row-name { flex: 1; }
+  .row-cn { color: var(--gold); font-size: 13px; margin-right: 6px; font-family: "Noto Serif SC", serif; }
+  .row-time { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .row-edit { background: transparent; border: none; color: var(--muted); padding: 4px 8px; font-size: 11px; }
+  .row-edit:hover { color: var(--accent); background: transparent; }
+  .editor {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    display: none;
+  }
+  .editor.open { display: block; }
+  .editor h3 { margin: 0 0 12px; font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; }
+  .editor-row { display: grid; grid-template-columns: 1.5fr 1fr 0.8fr 70px auto; gap: 6px; margin-bottom: 6px; }
+  input[type="text"], input[type="number"], textarea {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--ink);
+    padding: 7px 10px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 12px;
+  }
+  textarea { width: 100%; min-height: 44px; resize: vertical; margin-bottom: 6px; }
+  .editor-controls { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .footer { color: var(--muted); font-size: 11px; text-align: center; margin-top: 16px; line-height: 1.6; }
+  .footer a { color: var(--gold); text-decoration: none; }
+  .footer a:hover { text-decoration: underline; }
+  .audio-toggle {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: var(--paper);
+    padding: 4px 10px;
+    font-size: 10px;
+    letter-spacing: 1px;
+    z-index: 2;
+  }
+  @media (max-width: 600px) {
+    .calligraphy { font-size: 80px; }
+    .move-name { font-size: 20px; }
+    .timer { font-size: 52px; }
+    .editor-row { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>气功 · Qi Gong Morning</h1>
+  <span class="pill" id="status">Ready · 15 min</span>
+</header>
+
+<main>
+  <section class="stage" id="stage">
+    <div class="visual" id="visual">
+      <button class="audio-toggle" id="audioToggle">SOUND ON</button>
+      <div class="calligraphy" id="calligraphy">气功</div>
+    </div>
+    <div class="info">
+      <div class="move-num" id="moveNum">MOVEMENT 1 OF 15</div>
+      <div class="move-name" id="moveName">—</div>
+      <div class="move-pinyin" id="movePinyin">—</div>
+      <div class="move-desc" id="moveDesc">—</div>
+      <div class="timer" id="timer">01:00</div>
+    </div>
+    <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+    <div class="controls">
+      <button id="prevBtn">‹ Prev</button>
+      <button class="primary" id="playBtn">Start</button>
+      <button id="nextBtn">Next ›</button>
+      <button id="resetBtn">Reset</button>
+    </div>
+  </section>
+
+  <section class="list">
+    <div class="list-header">
+      <span>Sequence · 15 movements × 60s</span>
+      <button class="row-edit" id="toggleEditor">Edit routine</button>
+    </div>
+    <div id="rows"></div>
+  </section>
+
+  <section class="editor" id="editor">
+    <h3>Edit Routine</h3>
+    <div id="editorRows"></div>
+    <div class="editor-controls">
+      <button id="addRow">+ Add movement</button>
+      <button class="primary" id="saveRoutine">Save</button>
+      <button id="resetDefault">Reset to default</button>
+    </div>
+    <p style="color: var(--muted); font-size: 11px; margin-top: 10px;">
+      Columns: Name (EN) · CN characters · Pinyin · Seconds · Remove. Description in textarea below. Saved to browser only.
+    </p>
+  </section>
+
+  <div class="footer">
+    Saved locally · No data leaves your browser<br>
+    Drop cartoon images into <code>img/01.png</code> through <code>img/15.png</code> to replace the calligraphy. See <a href="image-prompts.md">image-prompts.md</a>.
+  </div>
+</main>
+
+<script>
+const DEFAULT_ROUTINE = [
+  { name: "Wake the Body", cn: "醒身", pinyin: "Xǐng Shēn", sec: 60, img: "01.png",
+    desc: "Stand feet shoulder-width. Gentle bouncing on the heels, arms loose. Wakes circulation and signals the body that practice is starting." },
+  { name: "Tap the Meridians", cn: "拍打经络", pinyin: "Pāidǎ Jīngluò", sec: 60, img: "02.png",
+    desc: "Loose fists. Tap kidneys (lower back), then chest, then down the arms inside and outside. Wakes the organ meridians." },
+  { name: "Neck and Shoulder Loosen", cn: "颈肩松", pinyin: "Jǐng Jiān Sōng", sec: 60, img: "03.png",
+    desc: "Slow neck circles each direction. Shoulder rolls forward and back. Release tension before the standing work begins." },
+  { name: "Spine Wave", cn: "脊柱波", pinyin: "Jǐzhù Bō", sec: 60, img: "04.png",
+    desc: "Hands on knees, soft bend. Cat-cow standing — round the spine on exhale, arch on inhale. Mobilises every vertebra." },
+  { name: "Hip Circles", cn: "转腰", pinyin: "Zhuǎn Yāo", sec: 60, img: "05.png",
+    desc: "Hands on hips, feet planted. Slow circles each direction. Opens the lower dan tian and warms the kidneys." },
+  { name: "Hold Up the Heavens", cn: "托天理三焦", pinyin: "Tuō Tiān Lǐ Sān Jiāo", sec: 60, img: "06.png",
+    desc: "Interlace fingers, palms up. Raise overhead on inhale, stretch the whole torso. Lower on exhale. Brocade 1 · Triple Burner." },
+  { name: "Drawing the Bow", cn: "左右开弓", pinyin: "Zuǒyòu Kāigōng", sec: 60, img: "07.png",
+    desc: "Horse stance. Push left palm out, right hand draws a bow across the chest. Eyes follow the index finger. Switch sides. Brocade 2 · Lungs." },
+  { name: "Separate Heaven and Earth", cn: "调理脾胃", pinyin: "Tiáolǐ Pí Wèi", sec: 60, img: "08.png",
+    desc: "One palm pushes up, the other presses down. Switch hands smoothly. Brocade 3 · regulates spleen and stomach." },
+  { name: "Wise Owl Gazes Back", cn: "五劳七伤往后瞧", pinyin: "Wǎng Hòu Qiáo", sec: 60, img: "09.png",
+    desc: "Arms relaxed. Turn head and upper torso to look behind, feet stay planted. Alternate sides. Brocade 4 · clears fatigue." },
+  { name: "Sway Head, Shake Tail", cn: "摇头摆尾", pinyin: "Yáotóu Bǎiwěi", sec: 60, img: "10.png",
+    desc: "Wide horse stance, hands on thighs. Lean forward and circle the torso slowly. Brocade 5 · clears heart fire." },
+  { name: "Touch Toes, Bend Back", cn: "两手攀足", pinyin: "Liǎng Shǒu Pān Zú", sec: 60, img: "11.png",
+    desc: "Bend forward, slide hands down legs toward feet. Rise slowly, hands to lower back, gentle backbend. Brocade 6 · kidneys." },
+  { name: "Punch with Fierce Gaze", cn: "攒拳怒目", pinyin: "Zǎn Quán Nù Mù", sec: 60, img: "12.png",
+    desc: "Horse stance. Slow alternating punches with focused gaze. Exhale on each punch. Brocade 7 · liver, builds qi and strength." },
+  { name: "Bouncing on the Toes", cn: "背后七颠", pinyin: "Bèihòu Qī Diān", sec: 60, img: "13.png",
+    desc: "Heels together. Rise onto the balls of the feet, then drop heels gently. Repeat. Brocade 8 · settles qi after the active brocades." },
+  { name: "Tiger Embraces Mountain", cn: "虎抱山", pinyin: "Hǔ Bào Shān", sec: 60, img: "14.png",
+    desc: "Wide stance. Tiger claws — slow powerful pushes forward with hooked palms. From the Five Animal Frolics. Builds courage and lung power." },
+  { name: "Standing Meditation", cn: "站桩", pinyin: "Zhàn Zhuāng", sec: 60, img: "15.png",
+    desc: "Feet shoulder-width, knees soft, arms held as if embracing a tree. Stillness. Gather the qi raised by the practice. Close." }
+];
+
+let routine = [];
+let idx = 0;
+let remaining = 0;
+let running = false;
+let timerId = null;
+let audioOn = true;
+
+const $ = id => document.getElementById(id);
+
+function loadRoutine() {
+  const saved = localStorage.getItem("qigong-routine-v2");
+  routine = saved ? JSON.parse(saved) : JSON.parse(JSON.stringify(DEFAULT_ROUTINE));
+}
+function saveRoutine() {
+  localStorage.setItem("qigong-routine-v2", JSON.stringify(routine));
+}
+
+async function imageExists(src) {
+  return new Promise(resolve => {
+    const i = new Image();
+    i.onload = () => resolve(true);
+    i.onerror = () => resolve(false);
+    i.src = src;
+  });
+}
+
+async function renderStage() {
+  const m = routine[idx];
+  if (!m) return;
+  $("moveNum").textContent = `MOVEMENT ${idx + 1} OF ${routine.length}`;
+  $("moveName").textContent = m.name;
+  $("movePinyin").textContent = m.pinyin || "";
+  $("moveDesc").textContent = m.desc;
+  if (!running) remaining = m.sec;
+  updateTimer();
+  $("stage").classList.toggle("active", running);
+
+  const visual = $("visual");
+  const audioBtn = $("audioToggle");
+  // remove old image if any
+  const oldImg = visual.querySelector("img");
+  if (oldImg) oldImg.remove();
+  const calligraphy = $("calligraphy");
+
+  if (m.img) {
+    const exists = await imageExists(`img/${m.img}`);
+    if (exists) {
+      calligraphy.style.display = "none";
+      const img = document.createElement("img");
+      img.src = `img/${m.img}`;
+      img.alt = m.name;
+      visual.insertBefore(img, audioBtn);
+      return;
+    }
+  }
+  calligraphy.style.display = "block";
+  calligraphy.innerHTML = `${m.cn} <span class="seal">${idx + 1}</span>`;
+}
+
+function renderList() {
+  const c = $("rows");
+  c.innerHTML = "";
+  routine.forEach((m, i) => {
+    const row = document.createElement("div");
+    row.className = "row" + (i === idx ? " current" : "") + (i < idx ? " done" : "");
+    row.innerHTML = `
+      <span class="row-num">${i + 1}</span>
+      <span class="row-cn">${m.cn}</span>
+      <span class="row-name">${m.name}</span>
+      <span class="row-time">${m.sec}s</span>
+    `;
+    row.onclick = () => { idx = i; running = false; clearInterval(timerId); $("playBtn").textContent = "Start"; renderStage(); renderList(); };
+    c.appendChild(row);
+  });
+}
+
+function updateTimer() {
+  const mins = Math.floor(remaining / 60).toString().padStart(2, "0");
+  const secs = (remaining % 60).toString().padStart(2, "0");
+  $("timer").textContent = `${mins}:${secs}`;
+  const m = routine[idx];
+  const pct = m ? ((m.sec - remaining) / m.sec) * 100 : 0;
+  $("progressBar").style.width = `${pct}%`;
+}
+
+function tick() {
+  remaining--;
+  updateTimer();
+  if (remaining <= 0) {
+    chime();
+    if (idx < routine.length - 1) {
+      idx++;
+      renderStage();
+      renderList();
+      remaining = routine[idx].sec;
+    } else {
+      stop();
+      $("status").textContent = "Complete";
+      longChime();
+    }
+  }
+}
+
+function play() {
+  if (!running) {
+    running = true;
+    $("playBtn").textContent = "Pause";
+    $("status").textContent = "Running";
+    $("stage").classList.add("active");
+    if (remaining <= 0) remaining = routine[idx].sec;
+    timerId = setInterval(tick, 1000);
+  } else {
+    stop();
+  }
+}
+
+function stop() {
+  running = false;
+  clearInterval(timerId);
+  $("playBtn").textContent = "Resume";
+  $("status").textContent = "Paused";
+  $("stage").classList.remove("active");
+}
+
+function next() {
+  if (idx < routine.length - 1) { idx++; remaining = routine[idx].sec; renderStage(); renderList(); }
+}
+function prev() {
+  if (idx > 0) { idx--; remaining = routine[idx].sec; renderStage(); renderList(); }
+}
+function reset() {
+  stop();
+  idx = 0;
+  remaining = routine[0].sec;
+  $("status").textContent = `Ready · ${Math.round(routine.reduce((s, m) => s + m.sec, 0) / 60)} min`;
+  $("playBtn").textContent = "Start";
+  renderStage();
+  renderList();
+}
+
+let audioCtx = null;
+function chime(freq = 660, duration = 0.25) {
+  if (!audioOn) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.frequency.value = freq;
+    o.type = "sine";
+    o.connect(g); g.connect(audioCtx.destination);
+    g.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.3, audioCtx.currentTime + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+    o.start(); o.stop(audioCtx.currentTime + duration);
+  } catch(e) {}
+}
+function longChime() {
+  chime(523, 0.4);
+  setTimeout(() => chime(659, 0.4), 300);
+  setTimeout(() => chime(784, 0.7), 600);
+}
+
+function renderEditor() {
+  const c = $("editorRows");
+  c.innerHTML = "";
+  routine.forEach((m, i) => {
+    const wrap = document.createElement("div");
+    wrap.style.marginBottom = "10px";
+    wrap.innerHTML = `
+      <div class="editor-row">
+        <input type="text" data-i="${i}" data-k="name" value="${esc(m.name)}" placeholder="Name (EN)">
+        <input type="text" data-i="${i}" data-k="cn" value="${esc(m.cn)}" placeholder="CN">
+        <input type="text" data-i="${i}" data-k="pinyin" value="${esc(m.pinyin || '')}" placeholder="Pinyin">
+        <input type="number" data-i="${i}" data-k="sec" value="${m.sec}" min="5" max="600">
+        <button data-i="${i}" class="row-edit del-btn">×</button>
+      </div>
+      <textarea data-i="${i}" data-k="desc" placeholder="Description">${esc(m.desc)}</textarea>
+    `;
+    c.appendChild(wrap);
+  });
+  c.querySelectorAll("input, textarea").forEach(el => {
+    el.addEventListener("input", e => {
+      const i = +e.target.dataset.i, k = e.target.dataset.k;
+      routine[i][k] = k === "sec" ? +e.target.value : e.target.value;
+    });
+  });
+  c.querySelectorAll(".del-btn").forEach(el => {
+    el.addEventListener("click", e => {
+      routine.splice(+e.target.dataset.i, 1);
+      renderEditor();
+    });
+  });
+}
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
+$("playBtn").onclick = play;
+$("nextBtn").onclick = next;
+$("prevBtn").onclick = prev;
+$("resetBtn").onclick = reset;
+$("toggleEditor").onclick = () => { $("editor").classList.toggle("open"); renderEditor(); };
+$("addRow").onclick = () => { routine.push({ name: "New Movement", cn: "", pinyin: "", sec: 60, desc: "", img: "" }); renderEditor(); };
+$("saveRoutine").onclick = () => { saveRoutine(); $("editor").classList.remove("open"); reset(); renderList(); $("status").textContent = "Saved"; };
+$("resetDefault").onclick = () => { if (confirm("Reset to default routine?")) { routine = JSON.parse(JSON.stringify(DEFAULT_ROUTINE)); saveRoutine(); renderEditor(); reset(); } };
+$("audioToggle").onclick = () => { audioOn = !audioOn; $("audioToggle").textContent = audioOn ? "SOUND ON" : "SOUND OFF"; };
+
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+  if (e.code === "Space") { e.preventDefault(); play(); }
+  if (e.code === "ArrowRight") next();
+  if (e.code === "ArrowLeft") prev();
+});
+
+loadRoutine();
+reset();
+</script>
+</body>
+</html>
