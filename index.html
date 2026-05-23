@@ -306,7 +306,6 @@
       <select id="voiceSelect">
         <option value="kai">Kai - warm female</option>
         <option value="aiden">Aiden - calm Australian male</option>
-        <option value="web">System voice (browser)</option>
       </select>
       <label for="bedSelect" style="margin-left:12px;">Bed</label>
       <select id="bedSelect">
@@ -388,6 +387,7 @@ let audioOn = localStorage.getItem("qigong-sound") !== "off";
 let voiceOn = audioOn;
 let voicePicked = null;
 let voiceKind = localStorage.getItem("qigong-voice-kind") || "kai";
+if (voiceKind === "web") voiceKind = "kai"; // migrate any stuck users away from old web option
 let bedKind = localStorage.getItem("qigong-bed-kind") || "1";
 const BED_VOLUME = 0.22;
 const BED_DUCK = 0.07;
