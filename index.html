@@ -514,9 +514,10 @@ function fireCues() {
   if (!voiceOn || !running) return;
   const m = routine[idx];
   if (!m) return;
-  const mid = Math.floor(m.sec / 2);
+  // Front-load instruction: mid cue fires 5s after start, leaving the rest of the timer for silent practice
+  const midTrigger = Math.max(5, m.sec - 5);
   const sentences = splitDesc(m.desc);
-  if (remaining === mid && sentences[1]) {
+  if (remaining === midTrigger && sentences[1]) {
     playCue(`mid_${slugify(m.name)}`, sentences[1]);
   }
   if (remaining === 10 && idx < routine.length - 1) {
