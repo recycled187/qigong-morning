@@ -223,10 +223,9 @@
   .footer { color: var(--muted); font-size: 11px; text-align: center; margin-top: 16px; line-height: 1.6; }
   .footer a { color: var(--gold); text-decoration: none; }
   .footer a:hover { text-decoration: underline; }
-  .audio-toggle {
+  .audio-toggle, .voice-toggle {
     position: absolute;
     top: 12px;
-    right: 12px;
     background: rgba(0,0,0,0.5);
     border: 1px solid rgba(255,255,255,0.2);
     color: var(--paper);
@@ -235,6 +234,9 @@
     letter-spacing: 1px;
     z-index: 2;
   }
+  .audio-toggle { right: 12px; }
+  .voice-toggle { right: 92px; }
+  .audio-toggle.off, .voice-toggle.off { opacity: 0.45; }
   @media (max-width: 600px) {
     .calligraphy { font-size: 80px; }
     .move-name { font-size: 20px; }
@@ -252,6 +254,7 @@
 <main>
   <section class="stage" id="stage">
     <div class="visual" id="visual">
+      <button class="voice-toggle" id="voiceToggle">VOICE ON</button>
       <button class="audio-toggle" id="audioToggle">SOUND ON</button>
       <div class="calligraphy" id="calligraphy">气功</div>
     </div>
@@ -293,7 +296,7 @@
   </section>
 
   <div class="footer">
-    Saved locally · No data leaves your browser<br>
+    Saved locally · No data leaves your browser · Voice uses on-device speech synth<br>
     Drop cartoon images into <code>img/01.png</code> through <code>img/15.png</code> to replace the calligraphy. See <a href="image-prompts.md">image-prompts.md</a>.
   </div>
 </main>
@@ -337,7 +340,9 @@ let idx = 0;
 let remaining = 0;
 let running = false;
 let timerId = null;
-let audioOn = true;
+let audioOn = localStorage.getItem("qigong-sound") !== "off";
+let voiceOn = localStorage.getItem("qigong-voice") !== "off";
+let voicePicked = null;
 
 const $ = id => document.getElementById(id);
 
@@ -420,6 +425,7 @@ function updateTimer() {
 function tick() {
   remaining--;
   updateTimer();
+  fireCues();
   if (remaining <= 0) {
     chime();
     if (idx < routine.length - 1) {
@@ -427,11 +433,71 @@ function tick() {
       renderStage();
       renderList();
       remaining = routine[idx].sec;
+      announceMovement();
     } else {
       stop();
       $("status").textContent = "Complete";
       longChime();
+      speak("Practice complete.");
     }
+  }
+}
+
+function splitDesc(desc) {
+  if (!desc) return [];
+  return desc.split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
+}
+
+function announceMovement() {
+  if (!voiceOn || !running) return;
+  const m = routine[idx];
+  if (!m) return;
+  const sentences = splitDesc(m.desc);
+  const first = sentences[0] || "";
+  speak(`Movement ${idx + 1}. ${m.name}. ${first}`);
+}
+
+function fireCues() {
+  if (!voiceOn || !running) return;
+  const m = routine[idx];
+  if (!m) return;
+  const mid = Math.floor(m.sec / 2);
+  const sentences = splitDesc(m.desc);
+  if (remaining === mid && sentences[1]) {
+    speak(sentences[1]);
+  }
+  if (remaining === 10 && idx < routine.length - 1) {
+    const next = routine[idx + 1];
+    speak(`Ten seconds. Next: ${next.name}.`);
+  }
+}
+
+function pickVoice() {
+  if (!("speechSynthesis" in window)) return null;
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+  const en = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith("en"));
+  const prefer = en.find(v => /samantha|karen|moira|google.*female|natural/i.test(v.name));
+  return prefer || en[0] || voices[0];
+}
+
+function speak(text) {
+  if (!voiceOn) return;
+  if (!("speechSynthesis" in window)) return;
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    if (!voicePicked) voicePicked = pickVoice();
+    if (voicePicked) u.voice = voicePicked;
+    u.rate = 0.92;
+    u.pitch = 1.0;
+    u.volume = 0.9;
+    window.speechSynthesis.speak(u);
+  } catch(e) {}
+}
+
+function cancelSpeech() {
+  if ("speechSynthesis" in window) {
+    try { window.speechSynthesis.cancel(); } catch(e) {}
   }
 }
 
@@ -442,6 +508,9 @@ function play() {
     $("status").textContent = "Running";
     $("stage").classList.add("active");
     if (remaining <= 0) remaining = routine[idx].sec;
+    // Prime speech synth on user gesture (mobile unlock)
+    if (voiceOn) speak("");
+    if (remaining === routine[idx].sec) announceMovement();
     timerId = setInterval(tick, 1000);
   } else {
     stop();
@@ -451,16 +520,25 @@ function play() {
 function stop() {
   running = false;
   clearInterval(timerId);
+  cancelSpeech();
   $("playBtn").textContent = "Resume";
   $("status").textContent = "Paused";
   $("stage").classList.remove("active");
 }
 
 function next() {
-  if (idx < routine.length - 1) { idx++; remaining = routine[idx].sec; renderStage(); renderList(); }
+  cancelSpeech();
+  if (idx < routine.length - 1) {
+    idx++; remaining = routine[idx].sec; renderStage(); renderList();
+    if (running) announceMovement();
+  }
 }
 function prev() {
-  if (idx > 0) { idx--; remaining = routine[idx].sec; renderStage(); renderList(); }
+  cancelSpeech();
+  if (idx > 0) {
+    idx--; remaining = routine[idx].sec; renderStage(); renderList();
+    if (running) announceMovement();
+  }
 }
 function reset() {
   stop();
@@ -535,7 +613,31 @@ $("toggleEditor").onclick = () => { $("editor").classList.toggle("open"); render
 $("addRow").onclick = () => { routine.push({ name: "New Movement", cn: "", pinyin: "", sec: 60, desc: "", img: "" }); renderEditor(); };
 $("saveRoutine").onclick = () => { saveRoutine(); $("editor").classList.remove("open"); reset(); renderList(); $("status").textContent = "Saved"; };
 $("resetDefault").onclick = () => { if (confirm("Reset to default routine?")) { routine = JSON.parse(JSON.stringify(DEFAULT_ROUTINE)); saveRoutine(); renderEditor(); reset(); } };
-$("audioToggle").onclick = () => { audioOn = !audioOn; $("audioToggle").textContent = audioOn ? "SOUND ON" : "SOUND OFF"; };
+$("audioToggle").onclick = () => {
+  audioOn = !audioOn;
+  $("audioToggle").textContent = audioOn ? "SOUND ON" : "SOUND OFF";
+  $("audioToggle").classList.toggle("off", !audioOn);
+  localStorage.setItem("qigong-sound", audioOn ? "on" : "off");
+};
+$("voiceToggle").onclick = () => {
+  voiceOn = !voiceOn;
+  $("voiceToggle").textContent = voiceOn ? "VOICE ON" : "VOICE OFF";
+  $("voiceToggle").classList.toggle("off", !voiceOn);
+  localStorage.setItem("qigong-voice", voiceOn ? "on" : "off");
+  if (!voiceOn) cancelSpeech();
+};
+
+// Reflect persisted state on load
+$("audioToggle").textContent = audioOn ? "SOUND ON" : "SOUND OFF";
+$("audioToggle").classList.toggle("off", !audioOn);
+$("voiceToggle").textContent = voiceOn ? "VOICE ON" : "VOICE OFF";
+$("voiceToggle").classList.toggle("off", !voiceOn);
+
+// Warm up voice list (Chrome loads async)
+if ("speechSynthesis" in window) {
+  window.speechSynthesis.onvoiceschanged = () => { voicePicked = pickVoice(); };
+  voicePicked = pickVoice();
+}
 
 document.addEventListener("keydown", e => {
   if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
