@@ -283,7 +283,8 @@
   <section class="stage" id="stage">
     <div class="visual" id="visual">
       <button class="audio-toggle" id="audioToggle">SOUND ON</button>
-      <audio id="soundBed" loop preload="auto" src="audio/bed.mp3"></audio>
+      <audio id="soundBed" loop preload="auto"></audio>
+      <audio id="voiceClip" preload="none"></audio>
       <div class="calligraphy" id="calligraphy">气功</div>
     </div>
     <div class="info">
@@ -302,7 +303,17 @@
     </div>
     <div class="voice-picker" id="voicePicker">
       <label for="voiceSelect">Voice</label>
-      <select id="voiceSelect"></select>
+      <select id="voiceSelect">
+        <option value="kai">Kai - warm female</option>
+        <option value="aiden">Aiden - calm Australian male</option>
+        <option value="web">System voice (browser)</option>
+      </select>
+      <label for="bedSelect" style="margin-left:12px;">Bed</label>
+      <select id="bedSelect">
+        <option value="1">Forest 1</option>
+        <option value="2">Forest 2</option>
+        <option value="off">Off</option>
+      </select>
       <button id="voiceSample">Sample</button>
     </div>
   </section>
@@ -376,8 +387,12 @@ let timerId = null;
 let audioOn = localStorage.getItem("qigong-sound") !== "off";
 let voiceOn = audioOn;
 let voicePicked = null;
-const BED_VOLUME = 0.18;
+let voiceKind = localStorage.getItem("qigong-voice-kind") || "kai";
+let bedKind = localStorage.getItem("qigong-bed-kind") || "1";
+const BED_VOLUME = 0.22;
+const BED_DUCK = 0.07;
 let bedFadeId = null;
+let bedDucked = false;
 
 const $ = id => document.getElementById(id);
 
@@ -473,7 +488,7 @@ function tick() {
       stop();
       $("status").textContent = "Complete";
       longChime();
-      speak("Practice complete.");
+      playCue("complete", "Practice complete.");
       fadeBed(0, 3000);
     }
   }
@@ -484,13 +499,15 @@ function splitDesc(desc) {
   return desc.split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
 }
 
+function slugify(s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); }
+
 function announceMovement() {
   if (!voiceOn || !running) return;
   const m = routine[idx];
   if (!m) return;
   const sentences = splitDesc(m.desc);
   const first = sentences[0] || "";
-  speak(`Movement ${idx + 1}. ${m.name}. ${first}`);
+  playCue(`start_${slugify(m.name)}`, `${m.name}. ${first}`);
 }
 
 function fireCues() {
@@ -500,11 +517,11 @@ function fireCues() {
   const mid = Math.floor(m.sec / 2);
   const sentences = splitDesc(m.desc);
   if (remaining === mid && sentences[1]) {
-    speak(sentences[1]);
+    playCue(`mid_${slugify(m.name)}`, sentences[1]);
   }
   if (remaining === 10 && idx < routine.length - 1) {
     const next = routine[idx + 1];
-    speak(`Ten seconds. Next: ${next.name}.`);
+    playCue(`next_${slugify(next.name)}`, `Ten seconds. Next: ${next.name}.`);
   }
 }
 
@@ -528,6 +545,45 @@ function rankVoice(v) {
   const lang = (v.lang || "").toLowerCase();
   if (/^en-(au|gb)/.test(lang)) score += 5;
   return score;
+}
+
+function duckBed(on) {
+  const bed = $("soundBed");
+  if (!bed || bed.paused) return;
+  bedDucked = on;
+  // Snap fade for ducking - 200ms
+  const target = on ? BED_DUCK : (audioOn && running ? BED_VOLUME : 0);
+  const start = bed.volume;
+  const steps = 8;
+  let i = 0;
+  const id = setInterval(() => {
+    i++;
+    bed.volume = Math.max(0, Math.min(1, start + (target - start) * (i / steps)));
+    if (i >= steps) clearInterval(id);
+  }, 25);
+}
+
+function playCue(cueKey, fallbackText) {
+  if (!voiceOn) return;
+  if (voiceKind === "web") { speakWeb(fallbackText); return; }
+  const clip = $("voiceClip");
+  if (!clip) { speakWeb(fallbackText); return; }
+  // Reset handlers
+  clip.onerror = null;
+  clip.onended = null;
+  clip.onplay = null;
+  let fallbackFired = false;
+  const fallback = () => {
+    if (fallbackFired) return;
+    fallbackFired = true;
+    duckBed(false);
+    speakWeb(fallbackText);
+  };
+  clip.onerror = fallback;
+  clip.onplay = () => duckBed(true);
+  clip.onended = () => duckBed(false);
+  clip.src = `voice/${voiceKind}/${cueKey}.mp3`;
+  clip.play().catch(fallback);
 }
 
 function pickVoice() {
@@ -561,8 +617,9 @@ function populateVoicePicker() {
   if (voicePicked) sel.value = voicePicked.name;
 }
 
-function speak(text) {
+function speakWeb(text) {
   if (!voiceOn) return;
+  if (!text) return;
   if (!("speechSynthesis" in window)) return;
   try {
     const u = new SpeechSynthesisUtterance(text);
@@ -571,14 +628,25 @@ function speak(text) {
     u.rate = 0.92;
     u.pitch = 1.0;
     u.volume = 0.9;
+    u.onstart = () => duckBed(true);
+    u.onend = () => duckBed(false);
+    u.onerror = () => duckBed(false);
     window.speechSynthesis.speak(u);
   } catch(e) {}
 }
+
+// Back-compat
+function speak(text) { speakWeb(text); }
 
 function cancelSpeech() {
   if ("speechSynthesis" in window) {
     try { window.speechSynthesis.cancel(); } catch(e) {}
   }
+  const clip = $("voiceClip");
+  if (clip) {
+    try { clip.pause(); clip.removeAttribute("src"); clip.load(); } catch(e) {}
+  }
+  duckBed(false);
 }
 
 function fadeBed(targetVol, ms = 1200) {
@@ -612,7 +680,7 @@ function play() {
     $("stage").classList.add("active");
     if (remaining <= 0) remaining = routine[idx].sec;
     // Prime speech synth on user gesture (mobile unlock)
-    if (voiceOn) speak("");
+    if (voiceOn && voiceKind === "web") speakWeb(" ");
     if (audioOn) fadeBed(BED_VOLUME);
     if (remaining === routine[idx].sec) announceMovement();
     timerId = setInterval(tick, 1000);
@@ -735,31 +803,54 @@ voiceOn = audioOn;
 $("audioToggle").textContent = audioOn ? "SOUND ON" : "SOUND OFF";
 $("audioToggle").classList.toggle("off", !audioOn);
 
-// Voice picker
-$("voiceSelect").addEventListener("change", e => {
-  const voices = window.speechSynthesis.getVoices();
-  const chosen = voices.find(v => v.name === e.target.value);
-  if (chosen) {
-    voicePicked = chosen;
-    localStorage.setItem("qigong-voice-name", chosen.name);
+function setBedSrc() {
+  const bed = $("soundBed");
+  if (!bed) return;
+  const wasPlaying = !bed.paused;
+  if (bedKind === "off") {
+    bed.pause();
+    bed.removeAttribute("src");
+    return;
   }
+  const newSrc = `audio/bed-${bedKind}.mp3`;
+  if (bed.getAttribute("src") === newSrc) return;
+  bed.src = newSrc;
+  if (wasPlaying && audioOn && running) {
+    bed.volume = bedDucked ? BED_DUCK : BED_VOLUME;
+    bed.play().catch(() => {});
+  }
+}
+
+$("voiceSelect").value = voiceKind;
+$("voiceSelect").addEventListener("change", e => {
+  voiceKind = e.target.value;
+  localStorage.setItem("qigong-voice-kind", voiceKind);
 });
+
+$("bedSelect").value = bedKind;
+$("bedSelect").addEventListener("change", e => {
+  bedKind = e.target.value;
+  localStorage.setItem("qigong-bed-kind", bedKind);
+  setBedSrc();
+  if (bedKind === "off") fadeBed(0);
+  else if (audioOn && running) fadeBed(BED_VOLUME);
+});
+
 $("voiceSample").onclick = () => {
   cancelSpeech();
   const wasOn = voiceOn;
   voiceOn = true;
-  speak("Movement six. Hold Up the Heavens. Interlace fingers, palms up.");
+  playCue("start_hold-up-the-heavens", "Hold Up the Heavens. Interlace fingers, palms up.");
   voiceOn = wasOn;
 };
 
-// Warm up voice list (Chrome loads async)
+// Initialise bed src on load
+setBedSrc();
+
+// Warm up Web Speech voice list (only used when voiceKind === 'web')
 if ("speechSynthesis" in window) {
-  window.speechSynthesis.onvoiceschanged = () => {
-    voicePicked = pickVoice();
-    populateVoicePicker();
-  };
+  window.speechSynthesis.onvoiceschanged = () => { voicePicked = pickVoice(); };
   voicePicked = pickVoice();
-  populateVoicePicker();
 }
 
 document.addEventListener("keydown", e => {
