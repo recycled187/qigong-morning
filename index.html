@@ -237,6 +237,34 @@
   .audio-toggle { right: 12px; }
   .voice-toggle { right: 92px; }
   .audio-toggle.off, .voice-toggle.off { opacity: 0.45; }
+  .voice-picker {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 24px 18px;
+    flex-wrap: wrap;
+  }
+  .voice-picker label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+  .voice-picker select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--ink);
+    padding: 7px 10px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 12px;
+    max-width: 280px;
+  }
+  .voice-picker button {
+    padding: 7px 14px;
+    font-size: 12px;
+  }
   @media (max-width: 600px) {
     .calligraphy { font-size: 80px; }
     .move-name { font-size: 20px; }
@@ -254,8 +282,8 @@
 <main>
   <section class="stage" id="stage">
     <div class="visual" id="visual">
-      <button class="voice-toggle" id="voiceToggle">VOICE ON</button>
       <button class="audio-toggle" id="audioToggle">SOUND ON</button>
+      <audio id="soundBed" loop preload="auto" src="audio/bed.mp3"></audio>
       <div class="calligraphy" id="calligraphy">气功</div>
     </div>
     <div class="info">
@@ -271,6 +299,11 @@
       <button class="primary" id="playBtn">Start</button>
       <button id="nextBtn">Next ›</button>
       <button id="resetBtn">Reset</button>
+    </div>
+    <div class="voice-picker" id="voicePicker">
+      <label for="voiceSelect">Voice</label>
+      <select id="voiceSelect"></select>
+      <button id="voiceSample">Sample</button>
     </div>
   </section>
 
@@ -341,8 +374,10 @@ let remaining = 0;
 let running = false;
 let timerId = null;
 let audioOn = localStorage.getItem("qigong-sound") !== "off";
-let voiceOn = localStorage.getItem("qigong-voice") !== "off";
+let voiceOn = audioOn;
 let voicePicked = null;
+const BED_VOLUME = 0.18;
+let bedFadeId = null;
 
 const $ = id => document.getElementById(id);
 
@@ -439,6 +474,7 @@ function tick() {
       $("status").textContent = "Complete";
       longChime();
       speak("Practice complete.");
+      fadeBed(0, 3000);
     }
   }
 }
@@ -472,13 +508,57 @@ function fireCues() {
   }
 }
 
+function rankVoice(v) {
+  const n = (v.name || "").toLowerCase();
+  let score = 0;
+  // Tier 1 - Win11 Natural / Neural voices (Aria, Jenny, Ryan, Guy, Davis, Tony, Sara)
+  if (/natural|neural/.test(n)) score += 100;
+  // Tier 2 - known-good system voices
+  if (/samantha|karen|moira|catherine|fiona|tessa|veena/.test(n)) score += 80;
+  // Tier 3 - premium / enhanced flags
+  if (/premium|enhanced|online/.test(n)) score += 50;
+  // Tier 4 - Google voices in Chrome
+  if (/google/.test(n)) score += 30;
+  // Penalty - known robotic defaults
+  if (/microsoft (david|zira|mark|hazel)( desktop)?\b/.test(n)) score -= 50;
+  if (/espeak/.test(n)) score -= 80;
+  // Bonus - localService=false often means cloud/higher quality
+  if (v.localService === false) score += 10;
+  // Bonus - AU/UK English nicer for guided practice
+  const lang = (v.lang || "").toLowerCase();
+  if (/^en-(au|gb)/.test(lang)) score += 5;
+  return score;
+}
+
 function pickVoice() {
   if (!("speechSynthesis" in window)) return null;
   const voices = window.speechSynthesis.getVoices();
   if (!voices.length) return null;
+  const savedName = localStorage.getItem("qigong-voice-name");
+  if (savedName) {
+    const saved = voices.find(v => v.name === savedName);
+    if (saved) return saved;
+  }
   const en = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith("en"));
-  const prefer = en.find(v => /samantha|karen|moira|google.*female|natural/i.test(v.name));
-  return prefer || en[0] || voices[0];
+  const pool = en.length ? en : voices;
+  return pool.slice().sort((a, b) => rankVoice(b) - rankVoice(a))[0];
+}
+
+function populateVoicePicker() {
+  if (!("speechSynthesis" in window)) return;
+  const sel = $("voiceSelect");
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return;
+  const en = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith("en"));
+  const pool = (en.length ? en : voices).slice().sort((a, b) => rankVoice(b) - rankVoice(a));
+  sel.innerHTML = "";
+  pool.forEach(v => {
+    const opt = document.createElement("option");
+    opt.value = v.name;
+    opt.textContent = `${v.name} · ${v.lang}`;
+    sel.appendChild(opt);
+  });
+  if (voicePicked) sel.value = voicePicked.name;
 }
 
 function speak(text) {
@@ -501,6 +581,29 @@ function cancelSpeech() {
   }
 }
 
+function fadeBed(targetVol, ms = 1200) {
+  const bed = $("soundBed");
+  if (!bed) return;
+  if (bedFadeId) clearInterval(bedFadeId);
+  if (!bed.src || bed.error) return;
+  if (targetVol > 0 && bed.paused) {
+    bed.volume = 0;
+    bed.play().catch(() => {});
+  }
+  const start = bed.volume;
+  const steps = 30;
+  let i = 0;
+  bedFadeId = setInterval(() => {
+    i++;
+    bed.volume = Math.max(0, Math.min(1, start + (targetVol - start) * (i / steps)));
+    if (i >= steps) {
+      clearInterval(bedFadeId);
+      bedFadeId = null;
+      if (targetVol === 0) bed.pause();
+    }
+  }, ms / steps);
+}
+
 function play() {
   if (!running) {
     running = true;
@@ -510,6 +613,7 @@ function play() {
     if (remaining <= 0) remaining = routine[idx].sec;
     // Prime speech synth on user gesture (mobile unlock)
     if (voiceOn) speak("");
+    if (audioOn) fadeBed(BED_VOLUME);
     if (remaining === routine[idx].sec) announceMovement();
     timerId = setInterval(tick, 1000);
   } else {
@@ -521,6 +625,7 @@ function stop() {
   running = false;
   clearInterval(timerId);
   cancelSpeech();
+  fadeBed(0);
   $("playBtn").textContent = "Resume";
   $("status").textContent = "Paused";
   $("stage").classList.remove("active");
@@ -613,30 +718,48 @@ $("toggleEditor").onclick = () => { $("editor").classList.toggle("open"); render
 $("addRow").onclick = () => { routine.push({ name: "New Movement", cn: "", pinyin: "", sec: 60, desc: "", img: "" }); renderEditor(); };
 $("saveRoutine").onclick = () => { saveRoutine(); $("editor").classList.remove("open"); reset(); renderList(); $("status").textContent = "Saved"; };
 $("resetDefault").onclick = () => { if (confirm("Reset to default routine?")) { routine = JSON.parse(JSON.stringify(DEFAULT_ROUTINE)); saveRoutine(); renderEditor(); reset(); } };
-$("audioToggle").onclick = () => {
-  audioOn = !audioOn;
-  $("audioToggle").textContent = audioOn ? "SOUND ON" : "SOUND OFF";
-  $("audioToggle").classList.toggle("off", !audioOn);
-  localStorage.setItem("qigong-sound", audioOn ? "on" : "off");
-};
-$("voiceToggle").onclick = () => {
-  voiceOn = !voiceOn;
-  $("voiceToggle").textContent = voiceOn ? "VOICE ON" : "VOICE OFF";
-  $("voiceToggle").classList.toggle("off", !voiceOn);
-  localStorage.setItem("qigong-voice", voiceOn ? "on" : "off");
-  if (!voiceOn) cancelSpeech();
-};
+function setSoundState(on) {
+  audioOn = on;
+  voiceOn = on;
+  $("audioToggle").textContent = on ? "SOUND ON" : "SOUND OFF";
+  $("audioToggle").classList.toggle("off", !on);
+  localStorage.setItem("qigong-sound", on ? "on" : "off");
+  if (!on) cancelSpeech();
+  if (!on) fadeBed(0); else if (running) fadeBed(BED_VOLUME);
+}
 
-// Reflect persisted state on load
+$("audioToggle").onclick = () => setSoundState(!audioOn);
+
+// One source of truth - voice follows sound
+voiceOn = audioOn;
 $("audioToggle").textContent = audioOn ? "SOUND ON" : "SOUND OFF";
 $("audioToggle").classList.toggle("off", !audioOn);
-$("voiceToggle").textContent = voiceOn ? "VOICE ON" : "VOICE OFF";
-$("voiceToggle").classList.toggle("off", !voiceOn);
+
+// Voice picker
+$("voiceSelect").addEventListener("change", e => {
+  const voices = window.speechSynthesis.getVoices();
+  const chosen = voices.find(v => v.name === e.target.value);
+  if (chosen) {
+    voicePicked = chosen;
+    localStorage.setItem("qigong-voice-name", chosen.name);
+  }
+});
+$("voiceSample").onclick = () => {
+  cancelSpeech();
+  const wasOn = voiceOn;
+  voiceOn = true;
+  speak("Movement six. Hold Up the Heavens. Interlace fingers, palms up.");
+  voiceOn = wasOn;
+};
 
 // Warm up voice list (Chrome loads async)
 if ("speechSynthesis" in window) {
-  window.speechSynthesis.onvoiceschanged = () => { voicePicked = pickVoice(); };
+  window.speechSynthesis.onvoiceschanged = () => {
+    voicePicked = pickVoice();
+    populateVoicePicker();
+  };
   voicePicked = pickVoice();
+  populateVoicePicker();
 }
 
 document.addEventListener("keydown", e => {
