@@ -309,6 +309,8 @@
       </select>
       <label for="bedSelect" style="margin-left:12px;">Bed</label>
       <select id="bedSelect">
+        <option value="m1">Meditative 1</option>
+        <option value="m2">Meditative 2</option>
         <option value="1">Forest 1</option>
         <option value="2">Forest 2</option>
         <option value="off">Off</option>
@@ -388,7 +390,13 @@ let voiceOn = audioOn;
 let voicePicked = null;
 let voiceKind = localStorage.getItem("qigong-voice-kind") || "kai";
 if (voiceKind === "web") voiceKind = "kai"; // migrate any stuck users away from old web option
-let bedKind = localStorage.getItem("qigong-bed-kind") || "1";
+let bedKind = localStorage.getItem("qigong-bed-kind") || "m1";
+// Migration: bump forest defaults to meditative (one-time)
+if (!localStorage.getItem("qigong-bed-migrated-v2") && (bedKind === "1" || bedKind === "2")) {
+  bedKind = "m1";
+  localStorage.setItem("qigong-bed-kind", bedKind);
+  localStorage.setItem("qigong-bed-migrated-v2", "1");
+}
 const BED_VOLUME = 0.22;
 const BED_DUCK = 0.07;
 let bedFadeId = null;
@@ -507,19 +515,14 @@ function announceMovement() {
   if (!m) return;
   const sentences = splitDesc(m.desc);
   const first = sentences[0] || "";
-  playCue(`start_${slugify(m.name)}`, `${m.name}. ${first}`);
+  // guide_<slug> is one continuous instruction with countdowns baked in (~20-30s)
+  playCue(`guide_${slugify(m.name)}`, `${m.name}. ${first}`);
 }
 
 function fireCues() {
   if (!voiceOn || !running) return;
   const m = routine[idx];
   if (!m) return;
-  // Front-load instruction: mid cue fires 5s after start, leaving the rest of the timer for silent practice
-  const midTrigger = Math.max(5, m.sec - 5);
-  const sentences = splitDesc(m.desc);
-  if (remaining === midTrigger && sentences[1]) {
-    playCue(`mid_${slugify(m.name)}`, sentences[1]);
-  }
   if (remaining === 10 && idx < routine.length - 1) {
     const next = routine[idx + 1];
     playCue(`next_${slugify(next.name)}`, `Ten seconds. Next: ${next.name}.`);
@@ -813,7 +816,7 @@ function setBedSrc() {
     bed.removeAttribute("src");
     return;
   }
-  const newSrc = `audio/bed-${bedKind}.mp3`;
+  const newSrc = (bedKind === "m1" || bedKind === "m2") ? `audio/music-${bedKind}.mp3` : `audio/bed-${bedKind}.mp3`;
   if (bed.getAttribute("src") === newSrc) return;
   bed.src = newSrc;
   if (wasPlaying && audioOn && running) {
