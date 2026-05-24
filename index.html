@@ -283,7 +283,6 @@
   <section class="stage" id="stage">
     <div class="visual" id="visual">
       <button class="audio-toggle" id="audioToggle">SOUND ON</button>
-      <audio id="soundBed" loop preload="auto"></audio>
       <audio id="voiceClip" preload="none"></audio>
       <div class="calligraphy" id="calligraphy">气功</div>
     </div>
@@ -307,15 +306,6 @@
         <option value="kai">Kai - warm female</option>
         <option value="aiden">Aiden - calm Australian male</option>
       </select>
-      <label for="bedSelect" style="margin-left:12px;">Bed</label>
-      <select id="bedSelect">
-        <option value="m1">Meditative 1</option>
-        <option value="m2">Meditative 2</option>
-        <option value="1">Forest 1</option>
-        <option value="2">Forest 2</option>
-        <option value="off">Off</option>
-      </select>
-      <button id="voiceSample">Sample</button>
     </div>
   </section>
 
@@ -389,18 +379,7 @@ let audioOn = localStorage.getItem("qigong-sound") !== "off";
 let voiceOn = audioOn;
 let voicePicked = null;
 let voiceKind = localStorage.getItem("qigong-voice-kind") || "kai";
-if (voiceKind === "web") voiceKind = "kai"; // migrate any stuck users away from old web option
-let bedKind = localStorage.getItem("qigong-bed-kind") || "m1";
-// Migration: bump forest defaults to meditative (one-time)
-if (!localStorage.getItem("qigong-bed-migrated-v2") && (bedKind === "1" || bedKind === "2")) {
-  bedKind = "m1";
-  localStorage.setItem("qigong-bed-kind", bedKind);
-  localStorage.setItem("qigong-bed-migrated-v2", "1");
-}
-const BED_VOLUME = 0.22;
-const BED_DUCK = 0.07;
-let bedFadeId = null;
-let bedDucked = false;
+if (voiceKind === "web") voiceKind = "kai";
 
 const $ = id => document.getElementById(id);
 
@@ -497,7 +476,6 @@ function tick() {
       $("status").textContent = "Complete";
       longChime();
       playCue("complete", "Practice complete.");
-      fadeBed(0, 3000);
     }
   }
 }
@@ -551,41 +529,20 @@ function rankVoice(v) {
   return score;
 }
 
-function duckBed(on) {
-  const bed = $("soundBed");
-  if (!bed || bed.paused) return;
-  bedDucked = on;
-  // Snap fade for ducking - 200ms
-  const target = on ? BED_DUCK : (audioOn && running ? BED_VOLUME : 0);
-  const start = bed.volume;
-  const steps = 8;
-  let i = 0;
-  const id = setInterval(() => {
-    i++;
-    bed.volume = Math.max(0, Math.min(1, start + (target - start) * (i / steps)));
-    if (i >= steps) clearInterval(id);
-  }, 25);
-}
-
 function playCue(cueKey, fallbackText) {
   if (!voiceOn) return;
   if (voiceKind === "web") { speakWeb(fallbackText); return; }
   const clip = $("voiceClip");
   if (!clip) { speakWeb(fallbackText); return; }
-  // Reset handlers
   clip.onerror = null;
   clip.onended = null;
-  clip.onplay = null;
   let fallbackFired = false;
   const fallback = () => {
     if (fallbackFired) return;
     fallbackFired = true;
-    duckBed(false);
     speakWeb(fallbackText);
   };
   clip.onerror = fallback;
-  clip.onplay = () => duckBed(true);
-  clip.onended = () => duckBed(false);
   clip.src = `voice/${voiceKind}/${cueKey}.mp3`;
   clip.play().catch(fallback);
 }
@@ -632,9 +589,6 @@ function speakWeb(text) {
     u.rate = 0.92;
     u.pitch = 1.0;
     u.volume = 0.9;
-    u.onstart = () => duckBed(true);
-    u.onend = () => duckBed(false);
-    u.onerror = () => duckBed(false);
     window.speechSynthesis.speak(u);
   } catch(e) {}
 }
@@ -650,31 +604,8 @@ function cancelSpeech() {
   if (clip) {
     try { clip.pause(); clip.removeAttribute("src"); clip.load(); } catch(e) {}
   }
-  duckBed(false);
 }
 
-function fadeBed(targetVol, ms = 1200) {
-  const bed = $("soundBed");
-  if (!bed) return;
-  if (bedFadeId) clearInterval(bedFadeId);
-  if (!bed.src || bed.error) return;
-  if (targetVol > 0 && bed.paused) {
-    bed.volume = 0;
-    bed.play().catch(() => {});
-  }
-  const start = bed.volume;
-  const steps = 30;
-  let i = 0;
-  bedFadeId = setInterval(() => {
-    i++;
-    bed.volume = Math.max(0, Math.min(1, start + (targetVol - start) * (i / steps)));
-    if (i >= steps) {
-      clearInterval(bedFadeId);
-      bedFadeId = null;
-      if (targetVol === 0) bed.pause();
-    }
-  }, ms / steps);
-}
 
 function play() {
   if (!running) {
@@ -685,7 +616,6 @@ function play() {
     if (remaining <= 0) remaining = routine[idx].sec;
     // Prime speech synth on user gesture (mobile unlock)
     if (voiceOn && voiceKind === "web") speakWeb(" ");
-    if (audioOn) fadeBed(BED_VOLUME);
     if (remaining === routine[idx].sec) announceMovement();
     timerId = setInterval(tick, 1000);
   } else {
@@ -697,7 +627,6 @@ function stop() {
   running = false;
   clearInterval(timerId);
   cancelSpeech();
-  fadeBed(0);
   $("playBtn").textContent = "Resume";
   $("status").textContent = "Paused";
   $("stage").classList.remove("active");
@@ -797,7 +726,6 @@ function setSoundState(on) {
   $("audioToggle").classList.toggle("off", !on);
   localStorage.setItem("qigong-sound", on ? "on" : "off");
   if (!on) cancelSpeech();
-  if (!on) fadeBed(0); else if (running) fadeBed(BED_VOLUME);
 }
 
 $("audioToggle").onclick = () => setSoundState(!audioOn);
@@ -807,49 +735,11 @@ voiceOn = audioOn;
 $("audioToggle").textContent = audioOn ? "SOUND ON" : "SOUND OFF";
 $("audioToggle").classList.toggle("off", !audioOn);
 
-function setBedSrc() {
-  const bed = $("soundBed");
-  if (!bed) return;
-  const wasPlaying = !bed.paused;
-  if (bedKind === "off") {
-    bed.pause();
-    bed.removeAttribute("src");
-    return;
-  }
-  const newSrc = (bedKind === "m1" || bedKind === "m2") ? `audio/music-${bedKind}.mp3` : `audio/bed-${bedKind}.mp3`;
-  if (bed.getAttribute("src") === newSrc) return;
-  bed.src = newSrc;
-  if (wasPlaying && audioOn && running) {
-    bed.volume = bedDucked ? BED_DUCK : BED_VOLUME;
-    bed.play().catch(() => {});
-  }
-}
-
 $("voiceSelect").value = voiceKind;
 $("voiceSelect").addEventListener("change", e => {
   voiceKind = e.target.value;
   localStorage.setItem("qigong-voice-kind", voiceKind);
 });
-
-$("bedSelect").value = bedKind;
-$("bedSelect").addEventListener("change", e => {
-  bedKind = e.target.value;
-  localStorage.setItem("qigong-bed-kind", bedKind);
-  setBedSrc();
-  if (bedKind === "off") fadeBed(0);
-  else if (audioOn && running) fadeBed(BED_VOLUME);
-});
-
-$("voiceSample").onclick = () => {
-  cancelSpeech();
-  const wasOn = voiceOn;
-  voiceOn = true;
-  playCue("start_hold-up-the-heavens", "Hold Up the Heavens. Interlace fingers, palms up.");
-  voiceOn = wasOn;
-};
-
-// Initialise bed src on load
-setBedSrc();
 
 // Warm up Web Speech voice list (only used when voiceKind === 'web')
 if ("speechSynthesis" in window) {
